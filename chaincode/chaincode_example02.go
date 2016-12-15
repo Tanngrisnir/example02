@@ -1,22 +1,3 @@
-/*
-Licensed to the Apache Software Foundation (ASF) under one
-or more contributor license agreements.  See the NOTICE file
-distributed with this work for additional information
-regarding copyright ownership.  The ASF licenses this file
-to you under the Apache License, Version 2.0 (the
-"License"); you may not use this file except in compliance
-with the License.  You may obtain a copy of the License at
-
-  http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing,
-software distributed under the License is distributed on an
-"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-KIND, either express or implied.  See the License for the
-specific language governing permissions and limitations
-under the License.
-*/
-
 package main
 
 import (
@@ -31,16 +12,17 @@ import (
 type SimpleChaincode struct {
 }
 
-func (t *SimpleChaincode) Init(stub *shim.ChaincodeStub, function string, args []string) ([]byte, error) {
+func (t *SimpleChaincode) Init(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
 	fmt.Printf("Init called, initializing chaincode")
 	
 	var A, B string    // Entities
 	var Aval, Bval int // Asset holdings
+	var Ahome, Bhome string //adresse
 	var err error
 
-	if len(args) != 4 {
-		return nil, errors.New("Incorrect number of arguments. Expecting 4")
-	}
+	// if len(args) != 4 {
+	//	return nil, errors.New("Incorrect number of arguments. Expecting 4")
+	// }
 
 	// Initialize the chaincode
 	A = args[0]
@@ -54,14 +36,19 @@ func (t *SimpleChaincode) Init(stub *shim.ChaincodeStub, function string, args [
 		return nil, errors.New("Expecting integer value for asset holding")
 	}
 	fmt.Printf("Aval = %d, Bval = %d\n", Aval, Bval)
+	
+	Ahome = args[4]
+	Bhome = args[5]
 
 	// Write the state to the ledger
 	err = stub.PutState(A, []byte(strconv.Itoa(Aval)))
+	// err = stub.PutState(A, Ahome)
 	if err != nil {
 		return nil, err
 	}
 
 	err = stub.PutState(B, []byte(strconv.Itoa(Bval)))
+	// err = stub.PutState(B, Bhome)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +57,7 @@ func (t *SimpleChaincode) Init(stub *shim.ChaincodeStub, function string, args [
 }
 
 // Transaction makes payment of X units from A to B
-func (t *SimpleChaincode) invoke(stub *shim.ChaincodeStub, args []string) ([]byte, error) {
+func (t *SimpleChaincode) invoke(stub shim.ChaincodeStubInterface, args []string) ([]byte, error) {
 	fmt.Printf("Running invoke")
 	
 	var A, B string    // Entities
@@ -126,7 +113,7 @@ func (t *SimpleChaincode) invoke(stub *shim.ChaincodeStub, args []string) ([]byt
 }
 
 // Deletes an entity from state
-func (t *SimpleChaincode) delete(stub *shim.ChaincodeStub, args []string) ([]byte, error) {
+func (t *SimpleChaincode) delete(stub shim.ChaincodeStubInterface, args []string) ([]byte, error) {
 	fmt.Printf("Running delete")
 	
 	if len(args) != 1 {
@@ -146,7 +133,7 @@ func (t *SimpleChaincode) delete(stub *shim.ChaincodeStub, args []string) ([]byt
 
 // Invoke callback representing the invocation of a chaincode
 // This chaincode will manage two accounts A and B and will transfer X units from A to B upon invoke
-func (t *SimpleChaincode) Invoke(stub *shim.ChaincodeStub, function string, args []string) ([]byte, error) {
+func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
 	fmt.Printf("Invoke called, determining function")
 	
 	// Handle different functions
@@ -166,7 +153,7 @@ func (t *SimpleChaincode) Invoke(stub *shim.ChaincodeStub, function string, args
 	return nil, errors.New("Received unknown function invocation")
 }
 
-func (t* SimpleChaincode) Run(stub *shim.ChaincodeStub, function string, args []string) ([]byte, error) {
+func (t* SimpleChaincode) Run(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
 	fmt.Printf("Run called, passing through to Invoke (same function)")
 	
 	// Handle different functions
@@ -187,7 +174,7 @@ func (t* SimpleChaincode) Run(stub *shim.ChaincodeStub, function string, args []
 }
 
 // Query callback representing the query of a chaincode
-func (t *SimpleChaincode) Query(stub *shim.ChaincodeStub, function string, args []string) ([]byte, error) {
+func (t *SimpleChaincode) Query(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
 	fmt.Printf("Query called, determining function")
 	
 	if function != "query" {
@@ -218,6 +205,37 @@ func (t *SimpleChaincode) Query(stub *shim.ChaincodeStub, function string, args 
 	jsonResp := "{\"Name\":\"" + A + "\",\"Amount\":\"" + string(Avalbytes) + "\"}"
 	fmt.Printf("Query Response:%s\n", jsonResp)
 	return Avalbytes, nil
+}
+
+func (t *SimpleChaincode) changeHome(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
+	fmt.Printf("Change Home")
+	
+	var A string // Entities
+	var Ahome
+	var err error
+
+	A = args[0]
+	Ahome = args[1]
+	stub.PutState(A+"-Home", Ahome)
+	
+	t.invoke(stub, {A, stub.GetState(A + "-Info"), 1})
+
+	fmt.Printf(A + " changed Home:%s\n", Ahome)
+	return nil, nil
+}
+
+func (t *SimpleChaincode) getInfoFrom(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
+	fmt.Printf("Change Home")
+	
+	var A, B string // Entities
+	var err error
+
+	A = args[0]
+	B = args[1]
+	stub.PutState(B + "-Info", A);
+
+	fmt.Printf(A + " gets Infos from:%s\n", B)
+	return nil, nil
 }
 
 func main() {
